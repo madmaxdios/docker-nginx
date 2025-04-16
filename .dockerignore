@@ -1,0 +1,9 @@
+*
+
+!package.json
+!package-lock.json
+!next.config.js
+!.next/
+!public/
+!src/
+!tsconfig.json

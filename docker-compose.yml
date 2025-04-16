@@ -1,0 +1,99 @@
+services:
+
+  nextjs:
+    container_name: nextjs
+    build: .
+    restart: always
+    volumes:
+      - ./logs/nextjs:/app/logs
+      - ./uploads:/app/uploads
+    expose:
+      - "${NEXTJS_PORT}"
+    networks:
+      - nextjs_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "https://localhost:${NEXTJS_PORT}/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    environment:
+      - START=${START:-true}
+      
+      - NEXTJS_PORT=${NEXTJS_PORT}
+
+      - VIRTUAL_HOST=${VIRTUAL_HOST}
+      - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+
+  nginx_dev:
+    container_name: nginx
+    build:
+      context: ./nginx/
+      dockerfile: Dockerfile.dev
+    profiles:
+      - development
+    ports:
+      - "8081:80"
+      - "8443:443"
+    volumes:
+      - ./logs/nginx:/var/log/nginx
+    healthcheck:
+      test: ["CMD-SHELL", "openssl x509 -noout -in /etc/nginx/certs/localhost.crt"]
+      interval: 24h
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - nextjs_network
+  
+  nginx-proxy:
+    container_name: nginx
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.prod
+    profiles:
+      - production
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - nginx_certs:/etc/nginx/certs:ro
+      - nginx_html:/usr/share/nginx/html
+      - ./logs/nginx:/var/log/nginx
+    networks:
+      - nextjs_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost || exit 1"]
+      interval: 300s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  
+  letsencrypt:
+    container_name: letsencrypt
+    image: nginxproxy/acme-companion:latest
+    profiles:
+      - production
+    restart: always
+    environment:
+      - DEFAULT_EMAIL=${LETSENCRYPT_EMAIL}
+    volumes_from:
+      - nginx-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - nginx_certs:/etc/nginx/certs:rw
+      - nginx_acme:/etc/acme.sh
+    depends_on:
+      - nginx-proxy
+
+networks:
+  nextjs_network:
+
+volumes:
+  nginx_certs:
+  nginx_html:
+  nginx_acme:

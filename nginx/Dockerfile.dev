@@ -1,0 +1,22 @@
+FROM nginxproxy:nginx-proxy
+
+# Install logrotate
+RUN apk add --no-cache logrotate bash
+
+# Copy configs
+COPY ./conf/log_format.conf /etc/nginx/conf.d/log_format.conf
+COPY ./conf/log_rotate.conf /etc/log_rotate.d/nginx
+COPY ./conf/entrypoint_dev.sh /entrypoint.sh
+COPY ./certs /etc/nginx/certs
+
+
+RUN mkdir -p /var/log/nginx \
+    && chown -R nginx:nginx /var/log/nginx \
+    && if [ ! -f /etc/nginx/certs/localhost.crt ] || [ ! -f /etc/nginx/certs/localhost.key ]; then \
+       echo "Error: SSL certificates not found in /etc/nginx/certs/"; \
+       echo "Please ensure localhost.crt and localhost.key exist"; \
+       exit 1; \
+    fi
+
+# Add cron job for logrotate
+RUN echo "0 0 * * * /usr/sbin/logrotate /etc/logrotate.d/nginx" >> /etc/crontabs/root
