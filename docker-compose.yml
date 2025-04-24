@@ -6,7 +6,6 @@ services:
     restart: always
     volumes:
       - ./logs/nextjs:/app/logs
-      - ./uploads:/app/uploads
     expose:
       - "${NEXTJS_PORT}"
     networks:
@@ -34,9 +33,10 @@ services:
     profiles:
       - development
     ports:
-      - "8081:80"
+      - "8081:80" # evitamos conflicto con el puerto 80 del host y 443
       - "8443:443"
     volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
       - ./logs/nginx:/var/log/nginx
     healthcheck:
       test: ["CMD-SHELL", "openssl x509 -noout -in /etc/nginx/certs/localhost.crt"]
